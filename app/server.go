@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 // Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
@@ -27,5 +28,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn.Write([]byte("+PONG\r\n+PONG\r\n"))
+	buf := make([]byte, 0, 1024)
+	for {
+		read, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println("Error when parsing command!", err.Error())
+			break
+		}
+		if read == 0 {
+			fmt.Println("No data read")
+			break
+		}
+		messages := strings.Split(string(buf), "\n")
+
+		for _, msg := range messages {
+			switch msg {
+			case "PING":
+				conn.Write([]byte("+PONG\r\n"))
+			default:
+				fmt.Println("Invalid command!")
+				break
+			}
+		}
+	}
 }
