@@ -46,7 +46,7 @@ func main() {
 			case "PING":
 				conn.Write([]byte("+PONG\r\n"))
 			default:
-				fmt.Println("Invalid command!")
+				fmt.Println("Invalid command -> ", string(buf))
 				break
 			}
 		}
