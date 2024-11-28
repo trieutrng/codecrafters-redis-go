@@ -33,7 +33,7 @@ func main() {
 	}
 }
 
-func handle(conn net.Conn) error {
+func handle(conn net.Conn) {
 	buf := make([]byte, 1024)
 	for {
 		read, err := conn.Read(buf)
