@@ -39,7 +39,7 @@ func main() {
 			fmt.Println("No data read")
 			break
 		}
-		messages := strings.Split(string(buf), "\n")
+		messages := strings.Split(string(buf), "\r\n")
 
 		for _, msg := range messages {
 			switch msg {
