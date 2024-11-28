@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	buf := make([]byte, 0, 1024)
+	buf := make([]byte, 1024)
 	for {
 		read, err := conn.Read(buf)
 		if err != nil {
