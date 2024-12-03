@@ -15,6 +15,10 @@ func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
 
+	// init dependencies
+	respParser := NewRESP()
+	processor := NewProcessor(respParser)
+
 	// Uncomment this block to pass the first stage
 	//
 	l, err := net.Listen("tcp", "0.0.0.0:6379")
@@ -29,11 +33,11 @@ func main() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handle(conn)
+		go handle(conn, processor)
 	}
 }
 
-func handle(conn net.Conn) {
+func handle(conn net.Conn, processor *Processor) {
 	buf := make([]byte, 1024)
 	for {
 		read, err := conn.Read(buf)
@@ -48,13 +52,12 @@ func handle(conn net.Conn) {
 		messages := strings.Split(string(buf), "\r\n")
 
 		for _, msg := range messages {
-			switch msg {
-			case "PING":
-				conn.Write([]byte("+PONG\r\n"))
-			default:
-				fmt.Println("Invalid command -> ", string(buf))
+			output, err := processor.accept([]byte(msg))
+			if err != nil {
+				fmt.Println("Invalid command -> ", err)
 				break
 			}
+			conn.Write(output)
 		}
 	}
 }
