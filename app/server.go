@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 )
 
 // Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
@@ -49,15 +48,11 @@ func handle(conn net.Conn, processor *Processor) {
 			fmt.Println("No data read")
 			break
 		}
-		messages := strings.Split(string(buf), "\r\n")
-
-		for _, msg := range messages {
-			output, err := processor.accept([]byte(msg))
-			if err != nil {
-				fmt.Println("Invalid command -> ", err)
-				break
-			}
-			conn.Write(output)
+		output, err := processor.accept(buf)
+		if err != nil {
+			fmt.Println("Invalid command -> ", err)
+			break
 		}
+		conn.Write(output)
 	}
 }
