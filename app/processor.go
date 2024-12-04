@@ -21,7 +21,7 @@ func NewProcessor(respParser RespParser) *Processor {
 	}
 }
 
-func (p *Processor) accept(cmd []byte) ([]byte, error) {
+func (p *Processor) Accept(cmd []byte) ([]byte, error) {
 	resp, err := p.parser.Deserialize(cmd)
 	if err != nil {
 		return nil, err

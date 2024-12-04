@@ -48,7 +48,7 @@ func handle(conn net.Conn, processor *Processor) {
 			fmt.Println("No data read")
 			break
 		}
-		output, err := processor.accept(buf)
+		output, err := processor.Accept(buf)
 		if err != nil {
 			fmt.Println("Invalid command -> ", err)
 			break
