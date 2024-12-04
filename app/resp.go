@@ -63,8 +63,12 @@ func (resp *RespParser) serialize_bulkString(input *RESP) []byte {
 	builder = append(builder, byte(BulkString))
 	builder = append(builder, []byte(fmt.Sprintf("%v", lenStr))...)
 	builder = append(builder, CR, LF)
-	builder = append(builder, input.Data...)
-	builder = append(builder, CR, LF)
+
+	if len(input.Data) > 0 {
+		builder = append(builder, input.Data...)
+		builder = append(builder, CR, LF)
+	}
+
 	return builder
 }
 

@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"time"
+)
 
 const (
 	Ping = "PING"
@@ -86,7 +90,28 @@ func set(memory *Memory) Executor {
 		argKey, argVal := resp.Nested[1], resp.Nested[2]
 		key, val := string(argKey.Data), string(argVal.Data)
 
-		memory.Put(key, val)
+		// build SET options
+		opts := Option{}
+		i := 3
+		for i < len(resp.Nested) {
+			argOpt := resp.Nested[i]
+			opt := ToLowerCase(string(argOpt.Data))
+			switch opt {
+			case "px":
+				if i == len(resp.Nested)-1 {
+					return nil, fmt.Errorf("invalid PX argument - missing PX value")
+				}
+				argPXVal := string(resp.Nested[i+1].Data)
+				pxVal, err := strconv.Atoi(argPXVal)
+				if err != nil {
+					return nil, fmt.Errorf("invalid PX argument - invalid PX value: %v", err)
+				}
+				opts.expiry = time.Duration(pxVal) * time.Millisecond
+			}
+			i++
+		}
+
+		memory.Put(key, val, opts)
 
 		return &RESP{
 			Type: SimpleString,
@@ -106,7 +131,7 @@ func get(memory *Memory) Executor {
 		val := memory.Get(key)
 
 		return &RESP{
-			Type: SimpleString,
+			Type: BulkString,
 			Data: []byte(val),
 		}, nil
 	}
