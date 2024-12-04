@@ -16,7 +16,8 @@ func main() {
 
 	// init dependencies
 	respParser := NewRESP()
-	processor := NewProcessor(respParser)
+	memory := NewMemory()
+	processor := NewProcessor(respParser, memory)
 
 	// Uncomment this block to pass the first stage
 	//

@@ -26,7 +26,8 @@ func TestProcessor_Accept(t *testing.T) {
 	}
 
 	respParser := NewRESP()
-	processor := NewProcessor(respParser)
+	memory := NewMemory()
+	processor := NewProcessor(respParser, memory)
 	for _, tt := range testcases {
 		output, err := processor.Accept([]byte(tt.args))
 		if err != nil {
