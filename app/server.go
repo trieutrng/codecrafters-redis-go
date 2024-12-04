@@ -50,7 +50,7 @@ func handle(conn net.Conn, processor *Processor) {
 		}
 		output, err := processor.Accept(buf)
 		if err != nil {
-			fmt.Println("Invalid command -> ", err)
+			fmt.Println("Invalid command: ", err)
 			break
 		}
 		conn.Write(output)
