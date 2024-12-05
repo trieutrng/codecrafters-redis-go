@@ -11,7 +11,8 @@ var _ = net.Listen
 var _ = os.Exit
 
 type serverOption struct {
-	port string
+	port      string
+	replicaOf string
 }
 
 type redisReplicationInfo struct {
@@ -33,16 +34,19 @@ func getServerOptions(args []string) serverOption {
 		port: "6379",
 	}
 	for i, arg := range args {
-		if arg == "--port" {
+		switch arg {
+		case "--port":
 			if i < len(args)-1 {
 				opts.port = args[i+1]
 			}
+		case "--replicaof":
+			opts.replicaOf = args[i+1]
 		}
 	}
 	return opts
 }
 
-func initDefaultReplicationInfo(procesor *Processor) {
+func initDefaultReplicationInfo(procesor *Processor, opts serverOption) {
 	ReplicationServerInfo = redisReplicationInfo{
 		Role:                       "master",
 		ConnectedSlaves:            0,
@@ -53,6 +57,11 @@ func initDefaultReplicationInfo(procesor *Processor) {
 		ReplBacklogSize:            1048576,
 		ReplBacklogFirstByteOffset: 0,
 		ReplBacklogHistlen:         0,
+	}
+
+	if len(opts.replicaOf) > 0 {
+		// masterAddr := strings.Split(opts.replicaOf, " ")
+		ReplicationServerInfo.Role = "slave"
 	}
 }
 
@@ -73,7 +82,7 @@ func main() {
 	processor := NewProcessor(respParser, memory)
 
 	// store replication info
-	go initDefaultReplicationInfo(processor)
+	go initDefaultReplicationInfo(processor, opts)
 
 	for {
 		conn, err := l.Accept()
