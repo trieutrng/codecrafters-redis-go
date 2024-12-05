@@ -15,18 +15,6 @@ type serverOption struct {
 	replicaOf string
 }
 
-type redisReplicationInfo struct {
-	Role                       string `info:"role"`
-	ConnectedSlaves            int    `info:"connected_slaves"`
-	MasterReplid               string `info:"master_replid"`
-	MasterReplOffset           int    `info:"master_repl_offset"`
-	SecondReplOffset           int    `info:"second_repl_offset"`
-	ReplBacklogActive          int    `info:"repl_backlog_active"`
-	ReplBacklogSize            int    `info:"repl_backlog_size"`
-	ReplBacklogFirstByteOffset int    `info:"repl_backlog_first_byte_offset"`
-	ReplBacklogHistlen         int    `info:"repl_backlog_histlen"`
-}
-
 var ReplicationServerInfo redisReplicationInfo
 
 func getServerOptions(args []string) serverOption {
@@ -46,25 +34,6 @@ func getServerOptions(args []string) serverOption {
 	return opts
 }
 
-func initDefaultReplicationInfo(procesor *Processor, opts serverOption) {
-	ReplicationServerInfo = redisReplicationInfo{
-		Role:                       "master",
-		ConnectedSlaves:            0,
-		MasterReplid:               "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb", // hard coded
-		MasterReplOffset:           0,
-		SecondReplOffset:           -1,
-		ReplBacklogActive:          0,
-		ReplBacklogSize:            1048576,
-		ReplBacklogFirstByteOffset: 0,
-		ReplBacklogHistlen:         0,
-	}
-
-	if len(opts.replicaOf) > 0 {
-		// masterAddr := strings.Split(opts.replicaOf, " ")
-		ReplicationServerInfo.Role = "slave"
-	}
-}
-
 func main() {
 	opts := getServerOptions(os.Args)
 
@@ -81,8 +50,12 @@ func main() {
 	memory := NewMemory()
 	processor := NewProcessor(respParser, memory)
 
-	// store replication info
-	go initDefaultReplicationInfo(processor, opts)
+	// process replication
+	err = InitReplication(processor, opts)
+	if err != nil {
+		fmt.Println("Error when replicating: ", err.Error())
+		os.Exit(1)
+	}
 
 	for {
 		conn, err := l.Accept()
