@@ -50,11 +50,12 @@ func (p *Processor) Accept(cmd []byte) ([]byte, error) {
 
 func initExecutors(memory *Memory) map[string]Executor {
 	return map[string]Executor{
-		"PING": ping(),
-		"ECHO": echo(),
-		"GET":  get(memory),
-		"SET":  set(memory),
-		"INFO": info(),
+		"PING":     ping(),
+		"ECHO":     echo(),
+		"GET":      get(memory),
+		"SET":      set(memory),
+		"INFO":     info(),
+		"REPLCONF": replConf(),
 	}
 }
 
@@ -147,6 +148,15 @@ func info() Executor {
 		return &RESP{
 			Type: BulkString,
 			Data: []byte(replInfo),
+		}, nil
+	}
+}
+
+func replConf() Executor {
+	return func(resp *RESP) (*RESP, error) {
+		return &RESP{
+			Type: SimpleString,
+			Data: []byte("OK"),
 		}, nil
 	}
 }
