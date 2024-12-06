@@ -56,6 +56,7 @@ func initExecutors(memory *Memory) map[string]Executor {
 		"SET":      set(memory),
 		"INFO":     info(),
 		"REPLCONF": replConf(),
+		"PSYNC":    psync(),
 	}
 }
 
@@ -157,6 +158,15 @@ func replConf() Executor {
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte("OK"),
+		}, nil
+	}
+}
+
+func psync() Executor {
+	return func(resp *RESP) (*RESP, error) {
+		return &RESP{
+			Type: SimpleString,
+			Data: []byte(fmt.Sprintf("+FULLRESYNC %v %v", ReplicationServerInfo.MasterReplid, ReplicationServerInfo.MasterReplOffset)),
 		}, nil
 	}
 }
