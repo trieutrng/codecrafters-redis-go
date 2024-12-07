@@ -58,6 +58,7 @@ func initExecutors(memory *Memory) map[string]Executor {
 		"REPLCONF": replConf(),
 		"PSYNC":    psync(),
 		"TYPE":     typeCmd(memory),
+		"XADD":     xadd(memory),
 	}
 }
 
@@ -111,7 +112,9 @@ func set(memory *Memory) Executor {
 			i++
 		}
 
-		memory.Put(key, val, opts)
+		memory.Put(key,
+			Entry{Type: "string", Value: val},
+			opts)
 
 		return &RESP{
 			Type: SimpleString,
@@ -132,7 +135,7 @@ func get(memory *Memory) Executor {
 
 		return &RESP{
 			Type: BulkString,
-			Data: []byte(val),
+			Data: []byte((val.Value).(string)),
 		}, nil
 	}
 }
@@ -181,16 +184,45 @@ func typeCmd(memory *Memory) Executor {
 		key := string(argKey.Data)
 
 		val := memory.Get(key)
-		if len(val) == 0 {
-			return &RESP{
-				Type: SimpleString,
-				Data: []byte("none"),
-			}, nil
-		}
-
 		return &RESP{
 			Type: SimpleString,
-			Data: []byte("string"),
+			Data: []byte(val.Type),
+		}, nil
+	}
+}
+
+func xadd(memory *Memory) Executor {
+	return func(resp *RESP) (*RESP, error) {
+		if len(resp.Nested) < 3 {
+			return nil, fmt.Errorf("insufficient arguments for XADD")
+		}
+		argStreamKey := resp.Nested[1]
+		key := string(argStreamKey.Data)
+		entry := memory.Get(key)
+
+		if entry.Type == "none" {
+			var newEntry StreamEntry = make(map[string]map[string]string)
+			entry = &Entry{
+				Type:  "stream",
+				Value: newEntry,
+			}
+		}
+
+		stream := (entry.Value).(StreamEntry)
+
+		id := string(resp.Nested[2].Data)
+		stream[id] = make(map[string]string)
+
+		for i := 3; i < len(resp.Nested); i += 2 {
+			key, value := string(resp.Nested[i].Data), string(resp.Nested[i+1].Data)
+			stream[id][key] = value
+		}
+
+		memory.Put(key, *entry, Option{})
+
+		return &RESP{
+			Type: BulkString,
+			Data: []byte(id),
 		}, nil
 	}
 }
