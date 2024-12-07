@@ -211,12 +211,16 @@ func xadd(memory *Memory) Executor {
 		stream := (entry.Value).(StreamEntry)
 		id := string(resp.Nested[2].Data)
 
-		err := ValidateStreamId(stream, id)
-		if err != nil {
-			return &RESP{
-				Type: SimpleError,
-				Data: []byte(err.Error()),
-			}, nil
+		if id == "*" || id[len(id)-1] == '*' {
+			id = GenerateNextSeq(stream, id)
+		} else {
+			err := ValidateStreamId(stream, id)
+			if err != nil {
+				return &RESP{
+					Type: SimpleError,
+					Data: []byte(err.Error()),
+				}, nil
+			}
 		}
 
 		stream[id] = make(map[string]string)

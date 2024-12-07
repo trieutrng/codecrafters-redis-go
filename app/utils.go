@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -33,14 +34,12 @@ func ValidateStreamId(streamEntry StreamEntry, id string) error {
 		sort.Strings(keys)
 		latest := keys[len(keys)-1]
 
-		fmt.Println(keys, latest, id)
-
-		splitedLatest := strings.Split(latest, "-")
-		lastTime, lastSeq = splitedLatest[0], splitedLatest[1]
+		splittedLatest := strings.Split(latest, "-")
+		lastTime, lastSeq = splittedLatest[0], splittedLatest[1]
 	}
 
-	splitedNow := strings.Split(id, "-")
-	time, seq := splitedNow[0], splitedNow[1]
+	splittedNow := strings.Split(id, "-")
+	time, seq := splittedNow[0], splittedNow[1]
 
 	if time == "0" && seq == "0" {
 		return fmt.Errorf("ERR The ID specified in XADD must be greater than 0-0")
@@ -51,4 +50,45 @@ func ValidateStreamId(streamEntry StreamEntry, id string) error {
 	}
 
 	return nil
+}
+
+func GenerateNextSeq(streamEntry StreamEntry, id string) string {
+	lastTime, lastSeq := "0", "0"
+	if len(streamEntry) > 0 {
+		keys := make([]string, 0, len(streamEntry))
+		for k := range streamEntry {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		latest := keys[len(keys)-1]
+
+		splittedLatest := strings.Split(latest, "-")
+		lastTime, lastSeq = splittedLatest[0], splittedLatest[1]
+	}
+
+	if id == "*" {
+		if lastTime == "0" && lastSeq == "0" {
+			return "0-1"
+		}
+		lastSeqInt, _ := strconv.Atoi(lastSeq)
+		return fmt.Sprintf("%v-%v", lastTime, lastSeqInt+1)
+	}
+
+	splitted := strings.Split(id, "-")
+	time, seq := splitted[0], "0"
+	if lastTime == "0" && lastSeq == "0" {
+		if time == "0" {
+			seq = "1"
+		} else {
+			seq = "0"
+		}
+	} else {
+		if time == lastTime {
+			seqInt, _ := strconv.Atoi(lastSeq)
+			seq = strconv.Itoa(seqInt + 1)
+		} else {
+			seq = "0"
+		}
+	}
+	return fmt.Sprintf("%v-%v", time, seq)
 }
