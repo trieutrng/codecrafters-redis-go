@@ -192,7 +192,7 @@ func (resp *RespParser) getType(char byte) (t RESPType, err error) {
 	case '*':
 		t = Arrays
 	default:
-		err = fmt.Errorf("type not found: %v", char)
+		err = fmt.Errorf("type not found: %c", rune(char))
 	}
 	return t, err
 }

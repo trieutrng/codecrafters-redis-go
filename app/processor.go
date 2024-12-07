@@ -57,6 +57,7 @@ func initExecutors(memory *Memory) map[string]Executor {
 		"INFO":     info(),
 		"REPLCONF": replConf(),
 		"PSYNC":    psync(),
+		"TYPE":     typeCmd(memory),
 	}
 }
 
@@ -167,6 +168,29 @@ func psync() Executor {
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte(fmt.Sprintf("+FULLRESYNC %v %v", ReplicationServerInfo.MasterReplid, ReplicationServerInfo.MasterReplOffset)),
+		}, nil
+	}
+}
+
+func typeCmd(memory *Memory) Executor {
+	return func(resp *RESP) (*RESP, error) {
+		if len(resp.Nested) < 2 {
+			return nil, fmt.Errorf("insufficient arguments for GET")
+		}
+		argKey := resp.Nested[1]
+		key := string(argKey.Data)
+
+		val := memory.Get(key)
+		if len(val) == 0 {
+			return &RESP{
+				Type: SimpleString,
+				Data: []byte("none"),
+			}, nil
+		}
+
+		return &RESP{
+			Type: SimpleString,
+			Data: []byte("string"),
 		}, nil
 	}
 }
