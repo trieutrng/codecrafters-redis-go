@@ -100,6 +100,9 @@ func QueryStreamKeysByRange(streamEntry StreamEntry, start string, end string) [
 	if start == "-" {
 		start = "0"
 	}
+	if end == "+" {
+		end = fmt.Sprintf("%v", time.Now().UnixMilli())
+	}
 	for key := range streamEntry {
 		if key >= start && key <= end {
 			output = append(output, key)
