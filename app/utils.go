@@ -68,9 +68,6 @@ func GenerateNextSeq(streamEntry StreamEntry, id string) string {
 	}
 
 	if id == "*" {
-		// if lastTime == "0" && lastSeq == "0" {
-		// 	return "0-1"
-		// }
 		currentMillis := time.Now().UnixMilli()
 		if lastTime == fmt.Sprintf("%v", currentMillis) {
 			lastSeqInt, _ := strconv.Atoi(lastSeq)
@@ -96,4 +93,15 @@ func GenerateNextSeq(streamEntry StreamEntry, id string) string {
 		}
 	}
 	return fmt.Sprintf("%v-%v", time, seq)
+}
+
+func QueryStreamKeysByRange(streamEntry StreamEntry, start string, end string) []string {
+	output := make([]string, 0, len(streamEntry))
+	for key := range streamEntry {
+		if key >= start && key <= end {
+			output = append(output, key)
+		}
+	}
+	sort.Strings(output)
+	return output
 }

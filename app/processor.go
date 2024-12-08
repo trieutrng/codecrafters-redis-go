@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -35,7 +36,8 @@ func (p *Processor) Accept(cmd []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid command: command empty")
 	}
 
-	executor, ok := p.executors[string(resp.Nested[0].Data)]
+	query := strings.ToUpper(string(resp.Nested[0].Data))
+	executor, ok := p.executors[query]
 	if !ok {
 		return nil, fmt.Errorf("command not supported")
 	}
@@ -59,6 +61,7 @@ func initExecutors(memory *Memory) map[string]Executor {
 		"PSYNC":    psync(),
 		"TYPE":     typeCmd(memory),
 		"XADD":     xadd(memory),
+		"XRANGE":   xrange(memory),
 	}
 }
 
@@ -236,5 +239,69 @@ func xadd(memory *Memory) Executor {
 			Type: BulkString,
 			Data: []byte(id),
 		}, nil
+	}
+}
+
+func xrange(memory *Memory) Executor {
+	return func(resp *RESP) (*RESP, error) {
+		if len(resp.Nested) < 4 {
+			return nil, fmt.Errorf("insufficient arguments for XRANGE")
+		}
+
+		argStreamKey := resp.Nested[1]
+		key := string(argStreamKey.Data)
+
+		entry := memory.Get(key)
+
+		if entry.Type == "none" {
+			return nil, fmt.Errorf("stream with key %v not found", key)
+		}
+
+		startArg, endArg := resp.Nested[2], resp.Nested[3]
+		start, end := string(startArg.Data), string(endArg.Data)
+
+		result := &RESP{
+			Type:   Arrays,
+			Nested: make([]*RESP, 0),
+		}
+		stream := (entry.Value).(StreamEntry)
+		keyRange := QueryStreamKeysByRange(stream, start, end)
+
+		for _, key := range keyRange {
+			// for the item key
+			itemKeyResp := &RESP{
+				Type: BulkString,
+				Data: []byte(key),
+			}
+			itemValueResp := &RESP{
+				Type:   Arrays,
+				Nested: make([]*RESP, 0),
+			}
+
+			// for the item values
+			item := stream[key]
+			for k, v := range item {
+				keyResp := &RESP{
+					Type: BulkString,
+					Data: []byte(k),
+				}
+				valueResp := &RESP{
+					Type: BulkString,
+					Data: []byte(v),
+				}
+				itemValueResp.Nested = append(itemValueResp.Nested, keyResp, valueResp)
+			}
+
+			itemResp := &RESP{
+				Type: Arrays,
+				Nested: []*RESP{
+					itemKeyResp,
+					itemValueResp,
+				},
+			}
+			result.Nested = append(result.Nested, itemResp)
+		}
+
+		return result, nil
 	}
 }
