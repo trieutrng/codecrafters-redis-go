@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -329,15 +330,47 @@ func xread(memory *Memory) Executor {
 			}
 			i += 1
 		}
-		if isBlocking {
-			<-time.After(time.Duration(blockingTime) * time.Millisecond)
-		}
 
 		streams := make(map[string]string)
 		numStream := int((len(resp.Nested) - i) / 2)
 
 		for j := i; j < len(resp.Nested)-numStream; j++ {
 			streams[string(resp.Nested[j].Data)] = string(resp.Nested[j+numStream].Data)
+		}
+
+		if isBlocking {
+			if blockingTime > 0 {
+				<-time.After(time.Duration(blockingTime) * time.Millisecond)
+			} else {
+				// block until there is update from the querying streams
+				waitCtx, cancel := context.WithCancel(context.Background())
+				updated, check := make(chan bool, 10), make(chan bool, 10)
+				for streamId := range streams {
+					entry := memory.Get(streamId)
+					stream := (entry.Value).(StreamEntry)
+
+					// for each stream, continuing check if there is any updates
+					go func(ctx context.Context, stream StreamEntry, check chan bool, updated chan bool, oldLen int) {
+						for {
+							select {
+							case <-ctx.Done():
+								return
+							case <-time.After(time.Duration(50) * time.Millisecond):
+								check <- true
+							case <-check:
+								if len(stream) > oldLen {
+									updated <- true
+								}
+							}
+						}
+					}(waitCtx, stream, check, updated, len(stream))
+				}
+
+				// wait until there is any update signal
+				<-updated
+				// cancel all the goroutine
+				cancel()
+			}
 		}
 
 		output := &RESP{
