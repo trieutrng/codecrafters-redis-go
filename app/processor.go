@@ -355,7 +355,7 @@ func xread(memory *Memory) Executor {
 							select {
 							case <-ctx.Done():
 								return
-							case <-time.After(time.Duration(50) * time.Millisecond):
+							case <-time.After(time.Duration(10) * time.Millisecond):
 								check <- true
 							case <-check:
 								if len(stream) > oldLen {

@@ -117,7 +117,11 @@ func QueryStreamKeysByRange(streamEntry StreamEntry, start string, end string, i
 			}
 		}
 	}
-
 	sort.Strings(output)
+
+	if start == "$" {
+		return []string{output[len(output)-1]}
+	}
+
 	return output
 }
