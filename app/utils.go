@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func RespTypeString(respType RESPType) string {
@@ -67,11 +68,15 @@ func GenerateNextSeq(streamEntry StreamEntry, id string) string {
 	}
 
 	if id == "*" {
-		if lastTime == "0" && lastSeq == "0" {
-			return "0-1"
+		// if lastTime == "0" && lastSeq == "0" {
+		// 	return "0-1"
+		// }
+		currentMillis := time.Now().UnixMilli()
+		if lastTime == fmt.Sprintf("%v", currentMillis) {
+			lastSeqInt, _ := strconv.Atoi(lastSeq)
+			return fmt.Sprintf("%v-%v", currentMillis, lastSeqInt+1)
 		}
-		lastSeqInt, _ := strconv.Atoi(lastSeq)
-		return fmt.Sprintf("%v-%v", lastTime, lastSeqInt+1)
+		return fmt.Sprintf("%v-%v", currentMillis, 0)
 	}
 
 	splitted := strings.Split(id, "-")
