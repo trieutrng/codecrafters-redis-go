@@ -97,6 +97,9 @@ func GenerateNextSeq(streamEntry StreamEntry, id string) string {
 
 func QueryStreamKeysByRange(streamEntry StreamEntry, start string, end string) []string {
 	output := make([]string, 0, len(streamEntry))
+	if start == "-" {
+		start = "0"
+	}
 	for key := range streamEntry {
 		if key >= start && key <= end {
 			output = append(output, key)
