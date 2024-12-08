@@ -62,6 +62,7 @@ func initExecutors(memory *Memory) map[string]Executor {
 		"TYPE":     typeCmd(memory),
 		"XADD":     xadd(memory),
 		"XRANGE":   xrange(memory),
+		"XREAD":    xread(memory),
 	}
 }
 
@@ -303,5 +304,89 @@ func xrange(memory *Memory) Executor {
 		}
 
 		return result, nil
+	}
+}
+
+func xread(memory *Memory) Executor {
+	return func(resp *RESP) (*RESP, error) {
+		if len(resp.Nested) < 4 {
+			return nil, fmt.Errorf("insufficient arguments for XREAD")
+		}
+
+		streams := make(map[string]string)
+		numStream := int((len(resp.Nested) - 2) / 2)
+
+		for i := 2; i < len(resp.Nested)-numStream; i++ {
+			streams[string(resp.Nested[i].Data)] = string(resp.Nested[i+numStream].Data)
+		}
+
+		output := &RESP{
+			Type:   Arrays,
+			Nested: make([]*RESP, 0),
+		}
+
+		// build output
+		for streamId, boundId := range streams {
+			entry := memory.Get(streamId)
+			stream := (entry.Value).(StreamEntry)
+			keyRange := QueryStreamKeysByRange(stream, boundId, "+")
+
+			streamItemResp := &RESP{
+				Type:   Arrays,
+				Nested: make([]*RESP, 0),
+			}
+
+			// for every item in stream
+			for _, key := range keyRange {
+				// for the item key
+				itemKeyResp := &RESP{
+					Type: BulkString,
+					Data: []byte(key),
+				}
+				itemValueResp := &RESP{
+					Type:   Arrays,
+					Nested: make([]*RESP, 0),
+				}
+
+				// for the item values
+				item := stream[key]
+				for k, v := range item {
+					keyResp := &RESP{
+						Type: BulkString,
+						Data: []byte(k),
+					}
+					valueResp := &RESP{
+						Type: BulkString,
+						Data: []byte(v),
+					}
+					itemValueResp.Nested = append(itemValueResp.Nested, keyResp, valueResp)
+				}
+
+				streamItemResp.Nested = append(streamItemResp.Nested, &RESP{
+					Type: Arrays,
+					Nested: []*RESP{
+						itemKeyResp,
+						itemValueResp,
+					},
+				})
+			}
+
+			// build output
+			streamIdResp := &RESP{
+				Type: BulkString,
+				Data: []byte(streamId),
+			}
+			streamQueryResp := &RESP{
+				Type: Arrays,
+				Nested: []*RESP{
+					streamIdResp,
+					streamItemResp,
+				},
+			}
+
+			output.Nested = append(output.Nested, streamQueryResp)
+		}
+
+		return output, nil
 	}
 }
