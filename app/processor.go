@@ -462,11 +462,15 @@ func incr(memory *Memory) Executor {
 
 		entry := memory.Get(key)
 		if entry.Type == "none" {
-			// TODO: add new entry here
+			newNumStr := strconv.FormatInt(1, 10)
+
+			memory.Put(key,
+				Entry{Type: "string", Value: newNumStr},
+				Option{})
 
 			return &RESP{
 				Type: Integers,
-				Data: []byte("1"),
+				Data: []byte(newNumStr),
 			}, nil
 		}
 
