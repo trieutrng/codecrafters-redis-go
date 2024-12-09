@@ -476,7 +476,10 @@ func incr(memory *Memory) Executor {
 
 		num, err := strconv.ParseInt((entry.Value).(string), 10, 64)
 		if err != nil {
-			return nil, err
+			return &RESP{
+				Type: SimpleError,
+				Data: []byte("ERR value is not an integer or out of range"),
+			}, nil
 		}
 
 		newNumStr := strconv.FormatInt(num+1, 10)
