@@ -9,23 +9,25 @@ import (
 	"time"
 )
 
-type Executor func(resp *RESP) (*RESP, error)
+type Executor func(ctx context.Context, resp *RESP) (*RESP, error)
 
 type Processor struct {
-	parser    RespParser
-	memory    *Memory
-	executors map[string]Executor
+	parser      RespParser
+	memory      *Memory
+	transaction *Transaction
+	executors   map[string]Executor
 }
 
-func NewProcessor(respParser RespParser, memory *Memory) *Processor {
+func NewProcessor(respParser RespParser, memory *Memory, transaction *Transaction) *Processor {
 	return &Processor{
-		parser:    respParser,
-		memory:    memory,
-		executors: initExecutors(memory),
+		parser:      respParser,
+		memory:      memory,
+		transaction: transaction,
+		executors:   initExecutors(memory, transaction),
 	}
 }
 
-func (p *Processor) Accept(cmd []byte) ([]byte, error) {
+func (p *Processor) Accept(txContext context.Context, cmd []byte) ([]byte, error) {
 	resp, err := p.parser.Deserialize(cmd)
 	if err != nil {
 		return nil, err
@@ -43,7 +45,7 @@ func (p *Processor) Accept(cmd []byte) ([]byte, error) {
 		return nil, fmt.Errorf("command not supported")
 	}
 
-	output, err := executor(resp)
+	output, err := executor(txContext, resp)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +53,7 @@ func (p *Processor) Accept(cmd []byte) ([]byte, error) {
 	return p.parser.Serialize(output), nil
 }
 
-func initExecutors(memory *Memory) map[string]Executor {
+func initExecutors(memory *Memory, transaction *Transaction) map[string]Executor {
 	return map[string]Executor{
 		"PING":     ping(),
 		"ECHO":     echo(),
@@ -65,11 +67,12 @@ func initExecutors(memory *Memory) map[string]Executor {
 		"XRANGE":   xrange(memory),
 		"XREAD":    xread(memory),
 		"INCR":     incr(memory),
+		"MULTI":    multi(transaction),
 	}
 }
 
 func ping() Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte("PONG"),
@@ -78,7 +81,7 @@ func ping() Executor {
 }
 
 func echo() Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 2 {
 			return nil, fmt.Errorf("ECHO command error: input insufficient")
 		}
@@ -90,7 +93,7 @@ func echo() Executor {
 }
 
 func set(memory *Memory) Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 3 {
 			return nil, fmt.Errorf("insufficient arguments for SET")
 		}
@@ -130,7 +133,7 @@ func set(memory *Memory) Executor {
 }
 
 func get(memory *Memory) Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 2 {
 			return nil, fmt.Errorf("insufficient arguments for GET")
 		}
@@ -147,7 +150,7 @@ func get(memory *Memory) Executor {
 }
 
 func info() Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		v := reflect.ValueOf(ReplicationServerInfo)
 		t := reflect.TypeOf(ReplicationServerInfo)
 		replInfo := ""
@@ -164,7 +167,7 @@ func info() Executor {
 }
 
 func replConf() Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte("OK"),
@@ -173,7 +176,7 @@ func replConf() Executor {
 }
 
 func psync() Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte(fmt.Sprintf("+FULLRESYNC %v %v", ReplicationServerInfo.MasterReplid, ReplicationServerInfo.MasterReplOffset)),
@@ -182,7 +185,7 @@ func psync() Executor {
 }
 
 func typeCmd(memory *Memory) Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 2 {
 			return nil, fmt.Errorf("insufficient arguments for GET")
 		}
@@ -198,7 +201,7 @@ func typeCmd(memory *Memory) Executor {
 }
 
 func xadd(memory *Memory) Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 3 {
 			return nil, fmt.Errorf("insufficient arguments for XADD")
 		}
@@ -246,7 +249,7 @@ func xadd(memory *Memory) Executor {
 }
 
 func xrange(memory *Memory) Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 4 {
 			return nil, fmt.Errorf("insufficient arguments for XRANGE")
 		}
@@ -310,7 +313,7 @@ func xrange(memory *Memory) Executor {
 }
 
 func xread(memory *Memory) Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 4 {
 			return nil, fmt.Errorf("insufficient arguments for XREAD")
 		}
@@ -454,7 +457,7 @@ func xread(memory *Memory) Executor {
 }
 
 func incr(memory *Memory) Executor {
-	return func(resp *RESP) (*RESP, error) {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		if len(resp.Nested) < 2 {
 			return nil, fmt.Errorf("insufficient arguments for INCR")
 		}
@@ -491,6 +494,18 @@ func incr(memory *Memory) Executor {
 		return &RESP{
 			Type: Integers,
 			Data: []byte(newNumStr),
+		}, nil
+	}
+}
+
+func multi(transaction *Transaction) Executor {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
+		txId := ctx.Value("txId").(string)
+		transaction.Start(txId)
+
+		return &RESP{
+			Type: SimpleString,
+			Data: []byte("OK"),
 		}, nil
 	}
 }

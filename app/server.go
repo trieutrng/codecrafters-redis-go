@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
+
+	"github.com/google/uuid"
 )
 
 // Ensures gofmt doesn't remove the "net" and "os" imports in stage 1 (feel free to remove this!)
@@ -46,7 +49,8 @@ func main() {
 	// init dependencies
 	respParser := NewRESP()
 	memory := NewMemory()
-	processor := NewProcessor(respParser, memory)
+	transaction := NewTransaction()
+	processor := NewProcessor(respParser, memory, transaction)
 
 	// process replication
 	err = InitReplication(processor, opts)
@@ -66,6 +70,7 @@ func main() {
 }
 
 func handle(conn net.Conn, processor *Processor) {
+	txContext := context.WithValue(context.Background(), "txId", uuid.New().String())
 	buf := make([]byte, 1024)
 	for {
 		read, err := conn.Read(buf)
@@ -77,7 +82,7 @@ func handle(conn net.Conn, processor *Processor) {
 			fmt.Println("No data read")
 			break
 		}
-		output, err := processor.Accept(buf)
+		output, err := processor.Accept(txContext, buf)
 		if err != nil {
 			fmt.Println("Invalid command: ", err)
 			break
