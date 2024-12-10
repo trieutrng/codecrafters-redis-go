@@ -53,7 +53,7 @@ func (p *Processor) Accept(txContext context.Context, cmd []byte) ([]byte, error
 	txId := txContext.Value("txId").(string)
 
 	if p.transaction.IsExisted(txId) &&
-		p.transaction.GetTx(txId).Status == TxActive && query != "EXEC" {
+		p.transaction.GetTx(txId).Status == TxActive && (query != "EXEC" && query != "DISCARD") {
 
 		// queue the cmd waiting for execution
 		p.transaction.Enqueue(txId, cmd)
@@ -88,6 +88,7 @@ func initExecutors(processor *Processor, memory *Memory, transaction *Transactio
 		"INCR":     incr(memory),
 		"MULTI":    multi(transaction),
 		"EXEC":     exec(processor, transaction),
+		"DISCARD":  discard(transaction),
 	}
 }
 
@@ -570,6 +571,28 @@ func exec(processor *Processor, transaction *Transaction) Executor {
 		return &RESP{
 			Type:   Arrays,
 			Nested: txResult,
+		}, nil
+	}
+}
+
+func discard(transaction *Transaction) Executor {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
+		txId := ctx.Value("txId").(string)
+
+		// exec nil transaction
+		if !transaction.IsExisted(txId) {
+			return &RESP{
+				Type: SimpleError,
+				Data: []byte("ERR DISCARD without MULTI"),
+			}, nil
+		}
+
+		// inactive transaction
+		transaction.Inactive(txId)
+
+		return &RESP{
+			Type: SimpleString,
+			Data: []byte("OK"),
 		}, nil
 	}
 }
