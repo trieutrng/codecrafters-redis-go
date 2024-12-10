@@ -19,12 +19,16 @@ type Processor struct {
 }
 
 func NewProcessor(respParser RespParser, memory *Memory, transaction *Transaction) *Processor {
-	return &Processor{
+	processor := &Processor{
 		parser:      respParser,
 		memory:      memory,
 		transaction: transaction,
-		executors:   initExecutors(memory, transaction),
 	}
+
+	executorFactory := initExecutors(processor, memory, transaction)
+	processor.executors = executorFactory
+
+	return processor
 }
 
 func (p *Processor) Accept(txContext context.Context, cmd []byte) ([]byte, error) {
@@ -48,9 +52,11 @@ func (p *Processor) Accept(txContext context.Context, cmd []byte) ([]byte, error
 	var output *RESP
 	txId := txContext.Value("txId").(string)
 
-	if p.transaction.IsActive(txId) && query != "EXEC" {
+	if p.transaction.IsExisted(txId) &&
+		p.transaction.GetTx(txId).Status == TxActive && query != "EXEC" {
+
 		// queue the cmd waiting for execution
-		p.transaction.Enqueue(txId, resp)
+		p.transaction.Enqueue(txId, cmd)
 
 		output = &RESP{
 			Type: SimpleString,
@@ -66,7 +72,7 @@ func (p *Processor) Accept(txContext context.Context, cmd []byte) ([]byte, error
 	return p.parser.Serialize(output), nil
 }
 
-func initExecutors(memory *Memory, transaction *Transaction) map[string]Executor {
+func initExecutors(processor *Processor, memory *Memory, transaction *Transaction) map[string]Executor {
 	return map[string]Executor{
 		"PING":     ping(),
 		"ECHO":     echo(),
@@ -81,7 +87,7 @@ func initExecutors(memory *Memory, transaction *Transaction) map[string]Executor
 		"XREAD":    xread(memory),
 		"INCR":     incr(memory),
 		"MULTI":    multi(transaction),
-		"EXEC":     exec(transaction),
+		"EXEC":     exec(processor, transaction),
 	}
 }
 
@@ -524,12 +530,12 @@ func multi(transaction *Transaction) Executor {
 	}
 }
 
-func exec(transaction *Transaction) Executor {
+func exec(processor *Processor, transaction *Transaction) Executor {
 	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		txId := ctx.Value("txId").(string)
 
 		// exec nil transaction
-		if !transaction.IsActive(txId) {
+		if !transaction.IsExisted(txId) {
 			return &RESP{
 				Type: SimpleError,
 				Data: []byte("ERR EXEC without MULTI"),
@@ -537,21 +543,33 @@ func exec(transaction *Transaction) Executor {
 		}
 
 		// inactive transaction
-		transaction.Inactive(txId)
+		defer transaction.Inactive(txId)
 
-		queued := transaction.GetTx(txId)
+		transaction.ChangeTxStatus(txId, TxExecuting)
+
+		// current transaction unit
+		txUnit := transaction.GetTx(txId)
 
 		// empty transaction
-		if len(queued) == 0 {
+		if len(txUnit.Queued) == 0 {
 			return &RESP{
 				Type:   Arrays,
 				Nested: []*RESP{},
 			}, nil
 		}
 
+		// TODO: executing the queued commands
+		txResult := make([]*RESP, 0)
+
+		for _, cmd := range txUnit.Queued {
+			cmdOutput, _ := processor.Accept(ctx, cmd)
+			cmdResp, _ := processor.parser.Deserialize(cmdOutput)
+			txResult = append(txResult, cmdResp)
+		}
+
 		return &RESP{
 			Type:   Arrays,
-			Nested: []*RESP{},
+			Nested: txResult,
 		}, nil
 	}
 }

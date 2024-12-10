@@ -234,6 +234,8 @@ func (resp *RespParser) getType(char byte) (t RESPType, err error) {
 		t = BulkString
 	case '*':
 		t = Arrays
+	case ':':
+		t = Integers
 	default:
 		err = fmt.Errorf("type not found: %c", rune(char))
 	}

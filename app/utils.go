@@ -16,6 +16,8 @@ func RespTypeString(respType RESPType) string {
 		return "BulkString"
 	case Arrays:
 		return "Arrays"
+	case Integers:
+		return "Integers"
 	}
 	return "Not found"
 }

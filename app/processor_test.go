@@ -38,7 +38,7 @@ func TestProcessor_Accept(t *testing.T) {
 		},
 	}
 
-	txContext := context.Background()
+	txContext := context.WithValue(context.Background(), "txId", "id")
 	respParser := NewRESP()
 	memory := NewMemory()
 	transaction := NewTransaction()

@@ -83,7 +83,12 @@ func handle(conn net.Conn, processor *Processor) {
 			fmt.Println("No data read")
 			break
 		}
-		output, err := processor.Accept(txContext, buf)
+
+		// deep copy to avoid referencing
+		bufCmd := make([]byte, len(buf))
+		copy(bufCmd, buf)
+
+		output, err := processor.Accept(txContext, bufCmd)
 		if err != nil {
 			fmt.Println("Invalid command: ", err)
 			break
