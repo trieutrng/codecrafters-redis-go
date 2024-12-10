@@ -10,6 +10,8 @@ import (
 
 func RespTypeString(respType RESPType) string {
 	switch respType {
+	case SimpleError:
+		return "SimpleError"
 	case SimpleString:
 		return "SimpleString"
 	case BulkString:

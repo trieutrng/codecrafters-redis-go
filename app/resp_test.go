@@ -30,6 +30,11 @@ func TestRespParser_Deserialize(t *testing.T) {
 			args:     []byte(":51\r\n"),
 			expected: Integers,
 		},
+		{
+			name:     "Deserialize 5",
+			args:     []byte("-ERR value is not an integer or out of range\r\n"),
+			expected: SimpleError,
+		},
 	}
 
 	respParser := NewRESP()
