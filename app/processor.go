@@ -67,6 +67,7 @@ func initExecutors(memory *Memory, transaction *Transaction) map[string]Executor
 		"XREAD":    xread(memory),
 		"INCR":     incr(memory),
 		"MULTI":    multi(transaction),
+		"EXEC":     exec(transaction),
 	}
 }
 
@@ -502,6 +503,22 @@ func multi(transaction *Transaction) Executor {
 		txId := ctx.Value("txId").(string)
 		transaction.Start(txId)
 
+		return &RESP{
+			Type: SimpleString,
+			Data: []byte("OK"),
+		}, nil
+	}
+}
+
+func exec(transaction *Transaction) Executor {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
+		txId := ctx.Value("txId").(string)
+		if !transaction.isActive(txId) {
+			return &RESP{
+				Type: SimpleError,
+				Data: []byte("ERR EXEC without MULTI"),
+			}, nil
+		}
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte("OK"),
