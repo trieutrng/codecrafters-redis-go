@@ -49,7 +49,6 @@ func (p *Processor) Accept(txContext context.Context, cmd []byte) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-
 	return p.parser.Serialize(output), nil
 }
 
