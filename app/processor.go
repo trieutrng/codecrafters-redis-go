@@ -45,10 +45,24 @@ func (p *Processor) Accept(txContext context.Context, cmd []byte) ([]byte, error
 		return nil, fmt.Errorf("command not supported")
 	}
 
-	output, err := executor(txContext, resp)
-	if err != nil {
-		return nil, err
+	var output *RESP
+	txId := txContext.Value("txId").(string)
+
+	if p.transaction.IsActive(txId) && query != "EXEC" {
+		// queue the cmd waiting for execution
+		p.transaction.Enqueue(txId, resp)
+
+		output = &RESP{
+			Type: SimpleString,
+			Data: []byte("QUEUED"),
+		}
+	} else {
+		output, err = executor(txContext, resp)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return p.parser.Serialize(output), nil
 }
 
@@ -536,8 +550,8 @@ func exec(transaction *Transaction) Executor {
 		}
 
 		return &RESP{
-			Type: SimpleString,
-			Data: []byte("OK"),
+			Type:   Arrays,
+			Nested: []*RESP{},
 		}, nil
 	}
 }

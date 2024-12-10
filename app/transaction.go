@@ -14,6 +14,15 @@ func (tx *Transaction) Start(txId string) {
 	tx.Active[txId] = make([]*RESP, 0)
 }
 
+func (tx *Transaction) Enqueue(txId string, cmd *RESP) {
+	_, ok := tx.Active[txId]
+	if !ok {
+		return
+	}
+	current := tx.Active[txId]
+	tx.Active[txId] = append(current, cmd)
+}
+
 func (tx *Transaction) IsActive(txId string) bool {
 	_, ok := tx.Active[txId]
 	return ok

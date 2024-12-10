@@ -70,7 +70,8 @@ func main() {
 }
 
 func handle(conn net.Conn, processor *Processor) {
-	txContext := context.WithValue(context.Background(), "txId", uuid.New().String())
+	txId := uuid.New().String()
+	txContext := context.WithValue(context.Background(), "txId", txId)
 	buf := make([]byte, 1024)
 	for {
 		read, err := conn.Read(buf)
