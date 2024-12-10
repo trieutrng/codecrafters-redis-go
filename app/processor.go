@@ -513,12 +513,28 @@ func multi(transaction *Transaction) Executor {
 func exec(transaction *Transaction) Executor {
 	return func(ctx context.Context, resp *RESP) (*RESP, error) {
 		txId := ctx.Value("txId").(string)
-		if !transaction.isActive(txId) {
+
+		// exec nil transaction
+		if !transaction.IsActive(txId) {
 			return &RESP{
 				Type: SimpleError,
 				Data: []byte("ERR EXEC without MULTI"),
 			}, nil
 		}
+
+		// inactive transaction
+		transaction.Inactive(txId)
+
+		queued := transaction.GetTx(txId)
+
+		// empty transaction
+		if len(queued) == 0 {
+			return &RESP{
+				Type:   Arrays,
+				Nested: []*RESP{},
+			}, nil
+		}
+
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte("OK"),
