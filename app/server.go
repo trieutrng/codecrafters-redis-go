@@ -14,8 +14,10 @@ var _ = net.Listen
 var _ = os.Exit
 
 type serverOption struct {
-	port      string
-	replicaOf string
+	port       string `conf:"port"`
+	replicaOf  string `conf:"replicaOf"`
+	dir        string `conf:"dir"`
+	dbfilename string `conf:"dbfilename"`
 }
 
 func getServerOptions(args []string) serverOption {
@@ -30,6 +32,10 @@ func getServerOptions(args []string) serverOption {
 			}
 		case "--replicaof":
 			opts.replicaOf = args[i+1]
+		case "--dir":
+			opts.dir = args[i+1]
+		case "--dbfilename":
+			opts.dbfilename = args[i+1]
 		}
 	}
 	return opts
@@ -50,7 +56,7 @@ func main() {
 	respParser := NewRESP()
 	memory := NewMemory()
 	transaction := NewTransaction()
-	processor := NewProcessor(respParser, memory, transaction)
+	processor := NewProcessor(respParser, memory, transaction, opts)
 
 	// process replication
 	err = InitReplication(processor, opts)

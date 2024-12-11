@@ -12,17 +12,19 @@ import (
 type Executor func(ctx context.Context, resp *RESP) (*RESP, error)
 
 type Processor struct {
-	parser      RespParser
-	memory      *Memory
-	transaction *Transaction
-	executors   map[string]Executor
+	parser       RespParser
+	memory       *Memory
+	transaction  *Transaction
+	serverOption serverOption
+	executors    map[string]Executor
 }
 
-func NewProcessor(respParser RespParser, memory *Memory, transaction *Transaction) *Processor {
+func NewProcessor(respParser RespParser, memory *Memory, transaction *Transaction, serverOption serverOption) *Processor {
 	processor := &Processor{
-		parser:      respParser,
-		memory:      memory,
-		transaction: transaction,
+		parser:       respParser,
+		memory:       memory,
+		transaction:  transaction,
+		serverOption: serverOption,
 	}
 
 	executorFactory := initExecutors(processor, memory, transaction)
@@ -89,6 +91,7 @@ func initExecutors(processor *Processor, memory *Memory, transaction *Transactio
 		"MULTI":    multi(transaction),
 		"EXEC":     exec(processor, transaction),
 		"DISCARD":  discard(transaction),
+		"CONFIG":   config(processor),
 	}
 }
 
@@ -593,6 +596,46 @@ func discard(transaction *Transaction) Executor {
 		return &RESP{
 			Type: SimpleString,
 			Data: []byte("OK"),
+		}, nil
+	}
+}
+
+func config(processor *Processor) Executor {
+	return func(ctx context.Context, resp *RESP) (*RESP, error) {
+		cmd := string(resp.Nested[1].Data)
+
+		switch cmd {
+		case "GET":
+			configType := string(resp.Nested[2].Data)
+
+			v := reflect.ValueOf(processor.serverOption)
+			t := reflect.TypeOf(processor.serverOption)
+
+			for i := 0; i < v.NumField(); i++ {
+				infoTag := v.Type().Field(i).Tag.Get("conf")
+				if infoTag == configType {
+					fieldValue := v.FieldByName(t.Field(i).Name).String()
+
+					return &RESP{
+						Type: Arrays,
+						Nested: []*RESP{
+							{
+								Type: BulkString,
+								Data: []byte(configType),
+							},
+							{
+								Type: BulkString,
+								Data: []byte(fieldValue),
+							},
+						},
+					}, nil
+				}
+			}
+		}
+
+		return &RESP{
+			Type:   Arrays,
+			Nested: make([]*RESP, 0),
 		}, nil
 	}
 }
